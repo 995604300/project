@@ -1,0 +1,42 @@
+Index: application/database.php
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- application/database.php	(date 1526023102000)
++++ application/database.php	(date 1526023146000)
+@@ -12,14 +12,14 @@
+ return [
+     // 数据库类型
+     'type'            => 'mysql',
+-    /*// 服务器地址
+-    'hostname'        => '47.96.0.240',
++    // 服务器地址
++    'hostname'        => '139.219.105.160',
+     // 数据库名
+     'database'        => 'rulaiyun',
+     // 用户名
+     'username'        => 'rulaiyun',
+     // 密码
+-    'password'        => 'dDxjwsHxRNx85Txs',*/
++    'password'        => 'AMi38zLkcADLxfNG',
+ 
+     /*// 服务器地址
+     'hostname'        => 'rm-bp1gjy42bblj4le4l2o.mysql.rds.aliyuncs.com',
+@@ -37,14 +37,14 @@
+     'username'        => 'rulaiyunsql%rulaiyun',
+     // 密码
+     'password'        => 'degattg85A',*/
+-    // 服务器地址
++    /*// 服务器地址
+     'hostname'        => 'localhost',
+     // 数据库名
+     'database'        => 'rulaiyun',
+     // 用户名
+     'username'        => 'rulaiyun',
+     // 密码
+-    'password'        => 'AMi38zLkcADLxfNG',
++    'password'        => 'AMi38zLkcADLxfNG',*/
+ 
+     // 端口
+     'hostport'        => '',
