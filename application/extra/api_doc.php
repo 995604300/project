@@ -8,5 +8,6 @@ return [
     '5' => ['name' => '楼层总控台管理', 'id' => '5', 'parent' => '0', 'readme' => '', 'class' => \app\api\controller\Room::class],
     '6' => ['name' => '教室管理', 'id' => '6', 'parent' => '0', 'readme' => '', 'class' => \app\api\controller\Classroom::class],
     '7' => ['name' => '用户管理', 'id' => '7', 'parent' => '0', 'readme' => '', 'class' => \app\api\controller\User::class],
+    '8' => ['name' => '统计查询', 'id' => '8', 'parent' => '0', 'readme' => '', 'class' => \app\api\controller\Statistics::class],
     '11' => ['name' => '登入登出', 'id' => '11', 'parent' => '0', 'readme' => '', 'class' => \app\api\controller\Login::class],
 ];

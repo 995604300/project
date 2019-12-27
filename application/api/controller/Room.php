@@ -9,13 +9,13 @@
  */
 
 namespace app\api\controller;
-use think\Config;
-use think\Db;
+
+use Ramsey\Uuid\Uuid;
 use think\Request;
 /**
  * Class Room
  * @title 楼层总控台管理
- * @url  localhost/api/Classes
+ * @url  localhost/api/Room
  * @desc 班级管理相关接口
  * @version 1.0
  */
@@ -23,6 +23,7 @@ class Room extends Base
 {
     //附加方法
     protected $extraActionList = [
+        'floorList',
     ];
     //跳过鉴权的方法
     protected $skipAuthActionList = [];
@@ -44,10 +45,20 @@ class Room extends Base
    public function index(Request $request){
        $start = getMicrotime();
        $size = $request->get('size') ? $request->get('size') : 10; //每页条数
-       $where = [];
-
+       $where['Type'] = 2;
+       $where['FuJiSuSheID'] = $request->get('floorId');
+       if (empty($where['FuJiSuSheID'])) {
+           $end = getMicrotime();
+           return $this->sendError(($end - $start),1,'参数错误！');
+       }
        $list = $this
            ->room_model
+           ->alias('r')
+           ->field('r.*,u.UserID,u.UserCode,u.UserName,u.RealName,u.PhoneNum,u.ClassId,u.RoleId')
+           ->join('kx_jc_SuShe_DoorLock_Arrange a','r.DoorLockNO=a.DoorLockNO','left')
+           ->join('kx_jc_ka k','a.DecKaID=k.DecKaID','left')
+           ->join('kx_jc_yonghuka y','k.KaID=y.KaID','left')
+           ->join('kx_jc_user u','y.UserID=y.UserID','left')
            ->where($where)
            ->paginate($size)
            ->toArray();
@@ -69,6 +80,8 @@ class Room extends Base
        if (!empty($array_data['id'])) {
            $result = $this->room_model->allowField(true)->isUpdate(TRUE)->save($array_data);
        } else {
+           $uuid1 = Uuid::uuid1();
+           $array_data['SuSheID'] = $uuid1->toString();
            $result = $this->room_model->allowField(true)->isUpdate(FALSE)->save($array_data);
        }
        if ($result) {
@@ -107,6 +120,24 @@ class Room extends Base
    }
 
     /**
+     * @title 楼层列表
+     * @param Request $request
+     * @throws \think\Exception
+     * author: Wang YX
+     * @readme /doc/md/api/Room/index.md
+     */
+    public function floorList(Request $request){
+        $start = getMicrotime();
+        $where['Type'] = 1;
+        $list = $this
+            ->room_model
+            ->select();
+        $list = collection($list)->toArray();
+        $end = getMicrotime();
+        return $this->sendSuccess(($end-$start),$list);
+    }
+
+    /**
      * 参数规则
      * @name 字段名称
      * @type 类型
@@ -122,14 +153,16 @@ class Room extends Base
             'index' => [
                 'page' => ['name' => 'page', 'type' => 'integer', 'require' => 'false', 'default' => '', 'desc' => '页', 'range' => '',],
                 'size' => ['name' => 'size', 'type' => 'integer', 'require' => 'false', 'default' => '', 'desc' => '每页数据条数', 'range' => '',],
+                'floorId' => ['name' => 'floorId', 'type' => 'integer', 'require' => 'true', 'default' => '', 'desc' => '楼层id', 'range' => '',],
             ],
             'save' => [
                 'id' => ['name' => 'id', 'type' => 'integer', 'require' => 'false', 'default' => '', 'desc' => '存在时为更新,否则为创建', 'range' => '',],
                 'roomName' => ['name' => 'roomName', 'type' => 'string', 'require' => 'true', 'default' => '', 'desc' => '房间名称', 'range' => '',],
-                'floor' => ['name' => 'floor', 'type' => 'integer', 'require' => 'false', 'default' => '', 'desc' => '楼层', 'range' => '',],
             ],
             'delete' => [
                 'id' => ['name' => 'id', 'type' => 'array', 'require' => 'true', 'default' => '', 'desc' => 'id', 'range' => '',],
+            ],
+            'floorList' => [
             ],
         ];
         //可以合并公共参数

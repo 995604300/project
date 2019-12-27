@@ -65,7 +65,7 @@ class Lesson extends Base
            $list = $this
                ->lesson_model
                ->with(['lessonClass'=>function($query){
-                   $query->with(['classes']);
+                   $query->alias('a')->join('kx_php_class c','a.classId=c.id');
                },])
                ->alias('l')
                ->field('l.*,cr.classroomName')
@@ -114,7 +114,7 @@ class Lesson extends Base
                    $save_data[$key]['classId'] = $value;
                    $save_data[$key]['lessonId'] = $lesson_id;
                }
-               $this->lesson_class_model->saveAll($save_data,FALSE);
+               $this->lesson_class_model->isUpdate(FALSE)->saveAll($save_data);
            }
            $end = getMicrotime();
            return $this->sendSuccess(($end - $start));

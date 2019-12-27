@@ -11,8 +11,8 @@
     "license": "Apache-2.0",
     "authors": [
         {
-            "name": "liwqbj",
-            "email": "liwqbj@qq.com"
+            "name": "wang",
+            "email": "wyx2019@outlook.com"
         }
     ],
     "require": {
@@ -50,7 +50,7 @@
     "repositories": {
         "packagist": {
             "type": "composer",
-            "url": "https://packagist.phpcomposer.com"
+            "url": "https://mirrors.aliyun.com/composer/"
         }
     }
 }

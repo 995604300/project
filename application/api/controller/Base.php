@@ -10,6 +10,7 @@
 namespace app\api\controller;
 use DawnApi\facade\ApiController;
 use gmars\rbac\Rbac;
+use think\App;
 use think\Session;
 use think\Db;
 use think\Model;
@@ -17,7 +18,7 @@ use think\Request;
 
 class Base extends ApiController
 {
-    public  $apiAuth = TRUE;                   //是否开启授权认证
+    public  $apiAuth = false;                   //是否开启授权认证
     protected $error_code = 0;                 //接口状态码
     protected $error_message = "成功";         //接口状态信息
     protected $is_login = false;                //是否开启登录验证
