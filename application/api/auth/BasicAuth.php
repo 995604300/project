@@ -1,10 +1,8 @@
 <?php
 /**
- *      [Wang YX] (C)2017-2099
- *      This is not a free software, without any authorization is not allowed to use and spread.
- *
+
  *      FILE_NAME: Auth.php
- *      AUTHOR: Wang YX(wyx141592@163.com)
+ *      AUTHOR: Wang YX()
  *      CREATE_TIME: 2019-09-16
  */
 namespace app\api\auth;

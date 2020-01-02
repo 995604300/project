@@ -32,7 +32,8 @@
         "gmars/tp5-rbac": "^1.2",
         "topthink/think-migration": "1.1.1",
         "endroid/qrcode": "^2.5",
-        "phpoffice/phpspreadsheet": "^1.9"
+        "phpoffice/phpspreadsheet": "^1.9",
+        "ramsey/uuid": "^3.9"
     },
     "extra": {
         "think-path": "thinkphp"

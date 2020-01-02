@@ -9,5 +9,6 @@ return [
     '6' => ['name' => '教室管理', 'id' => '6', 'parent' => '0', 'readme' => '', 'class' => \app\api\controller\Classroom::class],
     '7' => ['name' => '用户管理', 'id' => '7', 'parent' => '0', 'readme' => '', 'class' => \app\api\controller\User::class],
     '8' => ['name' => '统计查询', 'id' => '8', 'parent' => '0', 'readme' => '', 'class' => \app\api\controller\Statistics::class],
+    '9' => ['name' => '设备管理', 'id' => '9', 'parent' => '0', 'readme' => '', 'class' => \app\api\controller\Device::class],
     '11' => ['name' => '登入登出', 'id' => '11', 'parent' => '0', 'readme' => '', 'class' => \app\api\controller\Login::class],
 ];

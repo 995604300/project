@@ -1,24 +1,19 @@
 <?php
+
 /**
  *      [Wang YX] (C)2017-2099
  *      This is not a free software, without any authorization is not allowed to use and spread.
  *
- *      FILE_NAME: Lesson.php
+ *      FILE_NAME: Device.php
  *      AUTHOR: Wang YX(wyx141592@163.com)
- *      CREATE_TIME: 2019-10-08
+ *      CREATE_TIME: 2019-12-30
  */
 namespace app\api\model;
 use think\Model;
-use think\Session;
 
-class Lesson extends Model
+class Device extends Model
 {
-    protected $table = 'kx_php_lesson';
-
-    public function lessonClass()
-    {
-        return $this->hasMany('LessonClass','lessonId','id');
-    }
+    protected $table = 'kx_sb_guanli';
 
     /**
      * 单个与多个删除
@@ -30,6 +25,5 @@ class Lesson extends Model
         $res = $this->destroy($id);
         return $res;
     }
-
 
 }
