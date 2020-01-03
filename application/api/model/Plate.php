@@ -14,6 +14,15 @@ class Plate extends Model
 {
     protected $table = 'kx_php_plate';
 
+
+    public function lesson()
+    {
+        return $this->hasMany('Lesson','classroomId','classroomId');
+    }
+    public function classroom()
+    {
+        return $this->hasOne('Classroom','id','classroomId');
+    }
     /**
      * 单个与多个删除
      * @param $id

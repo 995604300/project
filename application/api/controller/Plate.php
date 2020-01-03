@@ -55,7 +55,7 @@ class Plate extends Base
    }
 
     /**
-     * @title 班牌的新增与编辑
+     * @title 班牌的绑定
      * @param Request $request
      * @throws \think\Exception
      * author: Wang YX
@@ -65,15 +65,12 @@ class Plate extends Base
        $start = getMicrotime();
        $array_data = $request->post();
 
-       if (!empty($array_data['id'])) {
-           $result = $this->plate_model->allowField(true)->isUpdate(TRUE)->save($array_data);
-       } else {
-           if (empty($array_data['PlateName']) || empty($array_data['SN']) || empty($array_data['IP'])) {
-               $end = getMicrotime();
-               return $this->sendError(($end - $start),1,'参数错误！');
-           }
-           $result = $this->plate_model->allowField(true)->isUpdate(FALSE)->save($array_data);
+       if (empty($array_data['sbID']) || empty($array_data['classroomId'])) {
+           $end = getMicrotime();
+           return $this->sendError(($end - $start),1,'参数错误！');
        }
+       $this->plate_model->where('sbID',$array_data['sbID'])->delete();
+       $result = $this->plate_model->allowField(true)->isUpdate(FALSE)->save($array_data);
 
        if ($result) {
            $end = getMicrotime();
@@ -111,27 +108,23 @@ class Plate extends Base
    }
 
     /**
-     * @title 获取班牌显示本周课程
+     * @title 设置班牌显示信息
      * @param Request $request
      * @throws \think\Exception
      * author: Wang YX
-     * @readme /doc/md/api/Plate/getLessons.md
+     * @readme /doc/md/api/Plate/setMessage.md
      */
-   public function getLessons(Request $request){
+   public function setMessage(Request $request){
        $start = getMicrotime();
-       $sn = $request->post('SN');
-       $week = getWeekMyActionAndEnd();
-       if (empty($sn)) {
-           $end = getMicrotime();
-           return $this->sendError(($end - $start),'参数错误!');
+       $title = $request->post('title');
+       $content = $request->post('content');
+       if (!empty($title)) {
+           $save_array['title'] = $title;
        }
-       $res = $this->plate_model
-           ->with(['lesson'=>function($query) use ($week){
-               $query->where('date','between',[$week['week_start'],$week['week_end']])->order('date')->order('startTime');
-           },'classroom'])
-           ->where('SN',$sn)
-           ->find()
-           ->toArray();
+       if (!empty($content)) {
+           $save_array['content'] = $content;
+       }
+       $res = Db::table('kx_php_plate_message')->where('id',1)->update($save_array);
        $end = getMicrotime();
        return $this->sendSuccess(($end - $start),$res);
    }
@@ -189,17 +182,15 @@ class Plate extends Base
                 'size' => ['name' => 'size', 'type' => 'integer', 'require' => 'false', 'default' => '', 'desc' => '每页数据条数', 'range' => '',],
             ],
             'save' => [
-                'id' => ['name' => 'id', 'type' => 'integer', 'require' => 'false', 'default' => '', 'desc' => '存在时为更新,否则为创建', 'range' => '',],
-                'PlateName' => ['name' => 'PlateName', 'type' => 'string', 'require' => 'true', 'default' => '', 'desc' => '班牌名称', 'range' => '',],
-                'IP' => ['name' => 'IP', 'type' => 'string', 'require' => 'false', 'default' => '', 'desc' => 'ip地址', 'range' => '',],
-                'SN' => ['name' => 'SN', 'type' => 'string', 'require' => 'false', 'default' => '', 'desc' => '班牌唯一识别码', 'range' => '',],
-                'ClassroomId' => ['name' => 'id', 'type' => 'integer', 'require' => 'false', 'default' => '', 'desc' => '绑定教室', 'range' => '',],
+                'sbID' => ['name' => 'SN', 'type' => 'string', 'require' => 'false', 'default' => '', 'desc' => '班牌唯一识别码', 'range' => '',],
+                'classroomId' => ['name' => 'classroomId', 'type' => 'integer', 'require' => 'false', 'default' => '', 'desc' => '绑定教室', 'range' => '',],
             ],
             'delete' => [
                 'id' => ['name' => 'id', 'type' => 'array', 'require' => 'true', 'default' => '', 'desc' => 'id', 'range' => '',],
             ],
-            'getLessons' => [
-                'SN' => ['name' => 'SN', 'type' => 'string', 'require' => 'true', 'default' => '', 'desc' => '设备唯一编码', 'range' => '',],
+            'setMessage' => [
+                'title' => ['name' => 'title', 'type' => 'string', 'require' => 'true', 'default' => '', 'desc' => '', 'range' => '',],
+                'content' => ['name' => 'content', 'type' => 'string', 'require' => 'true', 'default' => '', 'desc' => '', 'range' => '',],
             ],
             'record' => [
                 'sbID' => ['name' => 'sbID', 'type' => 'string', 'require' => 'true', 'default' => '', 'desc' => '设备id', 'range' => '',],

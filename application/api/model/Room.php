@@ -14,7 +14,6 @@ use think\Session;
 class Room extends Model
 {
     protected $table = 'kx_jc_SuShe';
-
     /**
      * 单个与多个删除
      * @param $id
