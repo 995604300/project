@@ -19,6 +19,9 @@ class LessonClass extends Model
     public function classes(){
         return $this->hasOne('Classes','id','classId',[],'LEFT')->field('id,className');
     }
+    public function lesson(){
+        return $this->hasOne('Lesson','id','lessonId',[],'LEFT')->field('id,lessonName,date,startTime,endTime');
+    }
     /**
      * 单个与多个删除
      * @param $id

@@ -23,6 +23,10 @@ class Plate extends Model
     {
         return $this->hasOne('Classroom','id','classroomId');
     }
+    public function device()
+    {
+        return $this->hasOne('Device','sbID','sbID');
+    }
     /**
      * 单个与多个删除
      * @param $id

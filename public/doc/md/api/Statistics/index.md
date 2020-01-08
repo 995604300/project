@@ -1,7 +1,7 @@
 ```
 请求方式：GET
 
-请求地址：'/api/Plate/index'
+请求地址：'/api/Statistics/index'
 
 
 返回成功格式：

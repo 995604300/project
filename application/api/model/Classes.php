@@ -18,6 +18,9 @@ class Classes extends Model
     public function user(){
         return $this->belongsTo('User','','YongHuZuZhiID',[],'LEFT')->field('UserName');
     }
+    public function lessonClass(){
+        return $this->hasMany('LessonClass','classId','id',[],'LEFT')->field('classId,lessonId');
+    }
 
     /**
      * 单个与多个删除

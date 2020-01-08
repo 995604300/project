@@ -22,6 +22,7 @@ class Device extends Base
 {
     //附加方法
     protected $extraActionList = [
+        'setCheckTime'
 
     ];
     //跳过鉴权的方法
@@ -36,7 +37,6 @@ class Device extends Base
 
     /**
      * @title 设备列表列表
-
      * @readme /doc/md/api/Device/index.md
      */
    public function index(Request $request){
@@ -59,8 +59,7 @@ class Device extends Base
    }
 
     /**
-     * @title 教室的新增与编辑
-
+     * @title 设备的编辑
      * @readme /doc/md/api/Device/save.md
      */
    public function save(Request $request){
@@ -75,6 +74,26 @@ class Device extends Base
            return $this->sendError(($end - $start));
        }
    }
+
+    /**
+     * @title 考勤时间设置
+     * @readme /doc/md/api/Device/setCheckTime.md
+     */
+   public function setCheckTime(Request $request){
+       $start = getMicrotime();
+       $array_data = $request->post();
+
+       $result = Db::table('kx_php_check_time')->insert($array_data);
+       if ($result) {
+           $end = getMicrotime();
+           return $this->sendSuccess(($end - $start));
+       } else {
+           $end = getMicrotime();
+           return $this->sendError(($end - $start));
+       }
+   }
+
+
 
 
     /**
@@ -98,6 +117,12 @@ class Device extends Base
                 'Title' => ['name' => 'Title', 'type' => 'string', 'require' => 'true', 'default' => '', 'desc' => '设备名称', 'range' => '',],
                 'sbID' => ['name' => 'sbID', 'type' => 'string', 'require' => 'true', 'default' => '', 'desc' => '序列号', 'range' => '',],
                 'IP' => ['name' => 'IP', 'type' => 'string', 'require' => 'true', 'default' => '', 'desc' => 'ip地址', 'range' => '',],
+            ],
+            'setCheckTime' => [
+                'id' => ['name' => 'id', 'type' => 'integer', 'require' => 'true', 'default' => '', 'desc' => '', 'range' => '',],
+                'startTime' => ['name' => 'startTime', 'type' => 'string', 'require' => 'true', 'default' => '', 'desc' => '开始时间', 'range' => '',],
+                'endTime' => ['name' => 'endTime', 'type' => 'string', 'require' => 'true', 'default' => '', 'desc' => '结束时间', 'range' => '',],
+                'type' => ['name' => 'type', 'type' => 'integer', 'require' => 'true', 'default' => '', 'desc' => '类型 1:门禁,2:食堂,3:客房', 'range' => '',],
             ],
 
         ];

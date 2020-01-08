@@ -27,9 +27,13 @@ class Login extends ApiController
     protected $extraActionList = [
         'login',
         'logout',
+        'garble'
     ];
     //跳过鉴权的方法
-    protected $skipAuthActionList = ['login'];
+    protected $skipAuthActionList = [
+        'login',
+        'garble'
+    ];
 
     protected $user_model;
 
@@ -61,6 +65,17 @@ class Login extends ApiController
             $end = getMicrotime();
             return $this->sendError(($end - $start));
         }
+    }
+
+    /**
+     * @title md5混淆
+     * @readme /doc/md/api/Login/garble.md
+     */
+    public function garble(Request $request) {
+        $start = getMicrotime();
+        $res = ['apikey'=>md5('apikey'.date('Y-m-d'))];
+        $end = getMicrotime();
+        return $this->sendSuccess(($end - $start),$res);
     }
 
     public static function getRules()

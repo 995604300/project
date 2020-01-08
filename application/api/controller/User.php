@@ -89,14 +89,13 @@ class User extends Base
            $end = getMicrotime();
            return $this->sendError(($end - $start),'参数错误!');
        }
-       $save_data['UserId'] = $array_data['userId'];
        if (!empty($array_data['classId'])) {
            $save_data['ClassId'] = $array_data['classId'];
        }
-       if (empty($array_data['roleId'])) {
+       if (!empty($array_data['roleId'])) {
            $save_data['RoleId'] = $array_data['roleId'];
        }
-       $result = $this->user_model->isUpdate(TRUE)->saveAll($save_data);
+       $result = $this->user_model->save($save_data,['UserId'=>$array_data['userId']]);
 
        if ($result) {
            $end = getMicrotime();
@@ -156,7 +155,7 @@ class User extends Base
                 'type' => ['name' => 'type', 'type' => 'integer', 'require' => 'false', 'default' => '', 'desc' => '用户角色类型(1,员工,2,学生)', 'range' => '',],
             ],
             'edit' => [
-                'userId' => ['name' => 'id', 'type' => 'integer', 'require' => 'true', 'default' => '', 'desc' => '用户id', 'range' => '',],
+                'userId' => ['name' => 'userId', 'type' => 'integer', 'require' => 'true', 'default' => '', 'desc' => '用户id', 'range' => '',],
                 'roleId' => ['name' => 'roleId', 'type' => 'integer', 'require' => 'false', 'default' => '', 'desc' => '角色id', 'range' => '',],
                 'classId' => ['name' => 'classId', 'type' => 'integer', 'require' => 'false', 'default' => '', 'desc' => '班级id', 'range' => '',],
             ],

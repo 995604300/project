@@ -117,6 +117,7 @@ class OauthAuth extends OAuth
         $data['RoleId'] = $userInfo['RoleId'];
         $data['ClassId'] = $userInfo['ClassId'];
         $data['client_id'] = $userInfo['UserName'];
+        $data['UserID'] = $userInfo['UserID'];
         //  key $client_id
         return $data;
     }

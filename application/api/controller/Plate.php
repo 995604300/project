@@ -47,7 +47,7 @@ class Plate extends Base
 
        $list = $this
            ->plate_model
-           ->with('classroom')
+           ->with(['classroom','device'])
            ->paginate($size)
            ->toArray();
        $end = getMicrotime();
@@ -123,6 +123,10 @@ class Plate extends Base
        }
        if (!empty($content)) {
            $save_array['content'] = $content;
+       }
+       if (empty($save_array)) {
+           $end = getMicrotime();
+           return $this->sendError(($end - $start),1,'参数错误!');
        }
        $res = Db::table('kx_php_plate_message')->where('id',1)->update($save_array);
        $end = getMicrotime();
