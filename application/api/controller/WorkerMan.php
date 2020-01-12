@@ -10,11 +10,11 @@ class WorkerMan extends Controller
 
     public function index()
     {
-        require_once 'C:\wamp64\www\information\card\app\Workerman\Autoloader.php';
+        require_once 'C:\wamp64\www\project\application\Workerman\Autoloader.php';
         // 心跳间隔55秒
         define('HEARTBEAT_TIME', 30);
         //websocket url
-        $socket_url = '192.168.0.111:2000';
+        $socket_url = '192.168.0.107:2000';
         // 初始化一个worker容器，监听1234端口
         $worker = new Worker('websocket://'.$socket_url);
         // 新增加一个属性，用来保存uid到connection的映射
@@ -26,15 +26,15 @@ class WorkerMan extends Controller
         $worker->count = 1;
         // worker进程启动后创建一个text Worker以便打开一个内部通讯端口
         $worker->onWorkerStart = function ($worker) {
-            $inner_text_url ='192.168.0.111:2001';
+            $inner_text_url ='192.168.0.107:2001';
             // 开启一个内部端口，方便内部系统推送数据，Text协议格式 文本+换行符
             $inner_text_worker = new Worker('text://'. $inner_text_url);
             $inner_text_worker->onMessage = function ($connection, $buffer) {
                 // $data数组格式，里面有uid，表示向那个uid的页面推送数据
                 $data = json_decode($buffer, true);
-                $uid = $data['uid'];
-                if($data['data'] == 'exam'){
-                    $number = $this->push_exam($buffer);
+//                $uid = $data['uid'];
+                if(!empty($data['sn'])){
+                    $number = $this->sendMessageByUid($data['sn'],$buffer);
                 }else{
                     // 通过workerman，向uid的页面推送数据
                     $number = $this->broadcast($buffer);
@@ -118,20 +118,20 @@ class WorkerMan extends Controller
         return $i;
     }
 
-    // 向所有验证的用户推送数据
-    public function push_exam($message = null)
-    {
-        global $worker;
-        $i = 0;
-        $data = json_decode($message, true);
-        foreach ($worker->uidConnections as $connection) {
-            if (in_array($connection->uid, $data['sn'])) {
-                $connection->send($message);
-                $i++;
-            }
-        }
-        return $i;
-    }
+//    // 向所有验证的用户推送数据
+//    public function push_exam($message = null)
+//    {
+//        global $worker;
+//        $i = 0;
+//        $data = json_decode($message, true);
+//        foreach ($worker->uidConnections as $connection) {
+//            if (in_array($connection->uid, $data['sn'])) {
+//                $connection->send($message);
+//                $i++;
+//            }
+//        }
+//        return $i;
+//    }
 
     // 针对uid推送数据
     public function sendMessageByUid($uid = null, $message = null)

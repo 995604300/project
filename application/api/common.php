@@ -77,14 +77,17 @@ function curl_post_https($url, $data = []){ // 模拟提交数据函数
     curl_setopt($curl,CURLOPT_HEADER,0);  //设置头信息
     curl_setopt($curl,CURLOPT_RETURNTRANSFER,1);  //设置curl_exec获取的信息的返回方式
     curl_setopt($curl,CURLOPT_POST,1);  //设置发送方式为post请求
-    curl_setopt($curl,CURLOPT_POSTFIELDS,$data);  //设置post的数据
+    curl_setopt($curl, CURLOPT_POSTFIELDS,json_encode($data));// 必须为字符串
+//    curl_setopt($curl,CURLOPT_POSTFIELDS,$data);  //设置post的数据
+
     $result = curl_exec($curl);
     if($result === false){
         echo curl_errno($curl);
+        var_dump(curl_error($curl));
         exit();
     }
-    var_dump($result);
     curl_close($curl);
+    return $result;
 }
 
 function geturl($url = '') {
@@ -207,81 +210,22 @@ function rand_str($length = 1, $chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ') //abcdefgh
     return $string;
 }
 
-//生成订单号
-function create_order_no($prefix = 'ORDER') {
-    $orderSn = rand_str().time().sprintf('%02d', rand(0, 99999));   //  随机数 5位
-    return $prefix.$orderSn;
-}
-
-
-
-/**
- * @param        $list    二维数组
- * @param string $pk      主键
- * @param string $pid     父id
- * @param string $child   子键名
- * @param int    $root
- * @return array
- * author: Wang YX
- */
-function list_to_tree($list, $pk='id', $pid = 'parent_id', $child = 'child', $root = 0) {
-    //创建Tree
-    $tree = array();
-
-    if (is_array($list)) {
-        //创建基于主键的数组引用
-        $refer = array();
-
-        foreach ($list as $key => $data) {
-            $refer[$data[$pk]] = &$list[$key];
-        }
-
-        foreach ($list as $key => $data) {
-            //判断是否存在parent
-            $parantId = $data[$pid];
-
-            if ($root == $parantId) {
-                $tree[] = &$list[$key];
-            } else {
-                if (isset($refer[$parantId])) {
-                    $parent = &$refer[$parantId];
-                    $parent[$child][] = &$list[$key];
-                }
-            }
-        }
-    }
-
-    return $tree;
-}
-
-
-/*
- * 获取某星期的开始时间和结束时间
- * time 时间
- * first 表示每周星期一为开始日期 0表示每周日为开始日期
- */
-function getWeekMyActionAndEnd($time = '', $first = 1)
+function Push($data,$sn = null)
 {
-    //当前日期
-    if (!$time) $time = time();
-    $sdefaultDate = date("Y-m-d", $time);
-    //$first =1 表示每周星期一为开始日期 0表示每周日为开始日期
-    //获取当前周的第几天 周日是 0 周一到周六是 1 - 6
-    $w = date('w', strtotime($sdefaultDate));
-    //获取本周开始日期，如果$w是0，则表示周日，减去 6 天
-    $week_start = date('Y-m-d', strtotime("$sdefaultDate -" . ($w ? $w - $first : 6) . ' days'));
-    //本周结束日期
-    $week_end = date('Y-m-d', strtotime("$week_start +6 days"));
-    return array("week_start" => $week_start, "week_end" => $week_end);
+    $inner_text_url = config('inner_url');
+    var_dump($inner_text_url);exit;
+    // 建立socket连接到内部推送端口
+    $client = stream_socket_client('tcp://' . $inner_text_url, $errno, $errmsg, 1);
+    // 推送的数据，包含uid字段，表示是给这个uid推送
+    $data = array('status' => true, 'code' => '200', 'data' => $data,'sn'=>$sn);
+    // 发送数据，注意5678端口是Text协议的端口，Text协议需要在数据末尾加上换行符
+    fwrite($client, json_encode($data) . "\n");
+    // 读取推送结果
+    $message =  fread($client, 8192);
 }
 
-//加密
-function phpEncrypt($data , $key , $iv) {
-    return openssl_encrypt($data,'AES-128-CBC', $key,0 , $iv);
-}
 
-//解密
-function phpDecrypt($data , $key ,$iv)
-{
-    return openssl_decrypt($data,'AES-128-CBC', $key,0 , $iv);
-}
+
+
+
+

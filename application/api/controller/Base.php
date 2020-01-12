@@ -18,7 +18,7 @@ use think\Request;
 
 class Base extends ApiController
 {
-    public  $apiAuth = false;                   //是否开启授权认证
+    public  $apiAuth = true;                   //是否开启授权认证
     protected $error_code = 0;                 //接口状态码
     protected $error_message = "成功";         //接口状态信息
     protected $is_login = false;                //是否开启登录验证
@@ -65,6 +65,20 @@ class Base extends ApiController
 //            }
 //
 //        }
+    }
+
+    public function Push($data,$sn = null)
+    {
+        $inner_text_url = '192.168.0.111:2001';
+        // 建立socket连接到内部推送端口
+        $client = stream_socket_client('tcp://' . $inner_text_url, $errno, $errmsg, 1);
+        // 推送的数据，包含uid字段，表示是给这个uid推送
+        $data = array('status' => true, 'code' => '200', 'data' => $data,'sn'=>$sn);
+        // 发送数据，注意5678端口是Text协议的端口，Text协议需要在数据末尾加上换行符
+        fwrite($client, json_encode($data) . "\n");
+        // 读取推送结果
+
+        $message =  fread($client, 8192);
     }
 
     public function authenticate(Request $request)

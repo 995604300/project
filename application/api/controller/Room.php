@@ -34,10 +34,11 @@ class Room extends Base
         'getUsers',
         'getUserCards',
         'rommList',
-        'getCards'
+        'getCards',
+        'getCardInfo',
     ];
     //跳过鉴权的方法
-    protected $skipAuthActionList = [];
+    protected $skipAuthActionList = ['getLockList'];
     protected $room_model;
     protected $ka_model;
     protected $user_model;
@@ -80,12 +81,12 @@ class Room extends Base
              ->join('kx_jc_yonghuka y','k.KaID=y.KaID','left')
              ->join('kx_jc_user u','y.UserID=u.UserID','left')
              ->join('kx_php_class c','c.id=u.ClassId','left')
-             ->where('DoorLockNO',$value['DoorLockNO'])
-             ->select();
+             ->where(['DoorLockNO'=>$value['DoorLockNO'],'color'=>['exp','is not null']])
+             ->find();
            if ($res) {
-               $list['data'][$key]['user'] = collection($res)->toArray();
+               $list['data'][$key]['color'] = $res['color'];
            } else {
-               $list['data'][$key]['user'] = [];
+               $list['data'][$key]['color'] = '';
            }
        }
 
@@ -134,8 +135,8 @@ class Room extends Base
    public function delete(Request $request){
        $start = getMicrotime();
        $array = $request->get();
-       if (!empty($array['id'])) {
-           $result = $this->room_model->delAll($array['id']);
+       if (!empty($array['SuSheID'])) {
+           $result = $this->room_model->delAll($array['SuSheID']);
        } else {
            $end = getMicrotime();
            return $this->sendError(($end - $start),1,'参数错误！');
@@ -160,9 +161,8 @@ class Room extends Base
    public function edit(Request $request){
        $start = getMicrotime();
        $array = $request->get();
-
-       if (!empty($array['id']) || !empty($array['genre'])) {
-           $result = $this->room_model->isUpdate(true)->save($array);
+       if (!empty($array['SuSheID']) || !empty($array['genre'])) {
+           $result = $this->room_model->isUpdate(true)->save(['SuSheID'=>$array['SuSheID'],'genre'=>$array['genre']]);
        } else {
            $end = getMicrotime();
            return $this->sendError(($end - $start),1,'参数错误！');
@@ -212,7 +212,7 @@ class Room extends Base
         }
         $user_res = $this->room_model
                  ->alias('r')
-                 ->field('r.*,u.UserID,u.UserCode,u.UserName,k.KaID,a.DecKaID,u.RealName,u.PhoneNum,u.ClassId,u.RoleId,u.sex')
+                 ->field('r.*,u.UserID,u.UserCode,u.UserName,k.KaID,k.KaName,a.DecKaID,u.RealName,u.PhoneNum,u.ClassId,u.RoleId,u.sex')
                  ->join('kx_jc_SuShe_DoorLock_Arrange a','r.DoorLockNO=a.DoorLockNO','left')
                  ->join('kx_jc_ka k','a.DecKaID=k.DecKaID','left')
                  ->join('kx_jc_yonghuka y','k.KaID=y.KaID','left')
@@ -246,6 +246,24 @@ class Room extends Base
     }
 
     /**
+     * @title 获取未绑定房间的房间卡
+     * @param Request $request
+     * @throws \think\Exception
+     * author: Wang YX
+     * @readme /doc/md/api/Room/getCardInfo.md
+     */
+    public function getCardInfo(Request $request){
+        $start = getMicrotime();
+        $KaID = $request->get('KaID');
+        $list = $this
+            ->ka_model
+            ->where('KaID',$KaID)
+            ->find();
+        $end = getMicrotime();
+        return $this->sendSuccess(($end-$start),$list);
+    }
+
+    /**
      * @title  验证卡号唯一性
      * @param Request $request
      * @throws \think\Exception
@@ -254,14 +272,14 @@ class Room extends Base
      */
     public function checkCard(Request $request){
         $start = getMicrotime();
-        $KaId = $request->post('KaId');
-        $res = Db::table('kx_jc_ka')->where('KaId',$KaId)->find();
+        $KaID = $request->post('KaID');
+        $res = Db::table('kx_jc_ka')->where('KaID',$KaID)->find();
         if ($res) {
             $end = getMicrotime();
-            return $this->sendError(($end - $start),1,'卡id已经存在,请修改后重试!');
+            return $this->sendError(($end - $start),1,'卡号已经存在,请修改后重试!');
         } else {
             $end = getMicrotime();
-            return $this->sendError(($end - $start));
+            return $this->sendSuccess(($end - $start));
         }
     }
     /**
@@ -274,12 +292,24 @@ class Room extends Base
     public function createCard(Request $request){
         $start = getMicrotime();
         $array_data = $request->post();
-        if (empty($array_data['DoorLockNO']) || empty($array_data['DecKaID']) || empty($array_data['KaId']) || empty($array_data['KaName'])) {
+        if (empty($array_data['DoorLockNO']) || empty($array_data['DecKaID']) || empty($array_data['KaID']) || empty($array_data['KaName'])) {
             $end = getMicrotime();
             return $this->sendError(($end - $start),1,'参数错误!');
         }
 
+        //添加门锁授权卡片
+        $data['apikey'] = md5('apikey'.date('Y-m-d'));
+        $data['Device_id'] = $array_data['DoorLockNO'];
+        $data['CardSerial'] = $array_data['DecKaID'];
+        $data['OperateType'] = 1;
+        $result = curl_post_https('http://127.0.0.1:15511/doorlockaddcard',$data);
+        if ($result->code != 0) {
+            $end = getMicrotime();
+            return $this->sendError(($end - $start));
+        }
+
         $res = self::$app['auth']->getUser();//获取登录用户信息
+        Db::table('kx_jc_SuShe_DoorLock_Arrange')->where('DecKaID',$array_data['DecKaID'])->delete();
         $result = Db::table('kx_jc_SuShe_DoorLock_Arrange')->insert([
             'DoorLockNO'=>$array_data['DoorLockNO'],
             'DecKaID'=>$array_data['DecKaID'],
@@ -288,9 +318,10 @@ class Room extends Base
                                                                         ]);
 
         if ($result) {
+            Db::table('kx_jc_ka')->where('DecKaID',$array_data['DecKaID'])->delete();
             Db::table('kx_jc_ka')->insert([
                 'DecKaID'=>$array_data['DecKaID'],
-                'KaId'=>$array_data['KaId'],
+                'KaID'=>$array_data['KaID'],
                 'KaName'=>$array_data['KaName'],
                 'KaPassword'=>123456,
                 'CreateOn'=>$res['UserID'],
@@ -317,6 +348,18 @@ class Room extends Base
             $end = getMicrotime();
             return $this->sendError(($end - $start),1,'参数错误!');
         }
+
+        //删除门锁授权卡片
+        $data['apikey'] = md5('apikey'.date('Y-m-d'));
+        $data['Device_id'] = $array_data['DoorLockNO'];
+        $data['CardSerial'] = $array_data['DecKaID'];
+        $data['OperateType'] = 0;
+        $result = curl_post_https('http://127.0.0.1:15511/doorlockaddcard',$data);
+        if ($result->code != 0) {
+            $end = getMicrotime();
+            return $this->sendError(($end - $start));
+        }
+
         $result = Db::table('kx_jc_SuShe_DoorLock_Arrange')->where($array_data)->delete();
         Db::table('kx_jc_ka')->where('DecKaID',$array_data['DecKaID'])->delete();
 
@@ -348,6 +391,7 @@ class Room extends Base
         $array_data['KaiShiShiJian'] = date('Y-m-d H:i:s');
         $result = Db::table('kx_jc_yonghuka')->insert($array_data);
         if ($result) {
+            $this->user_model->save(['UserID'=>$array_data['UserID'],'UserCode'=>$array_data['KaID']]);
             $end = getMicrotime();
             return $this->sendSuccess(($end - $start));
         } else {
@@ -392,10 +436,12 @@ class Room extends Base
     public function getUsers(Request $request){
         $start = getMicrotime();
         $list = $this->user_model
+            ->with('classes')
             ->alias('u')
-            ->field('u.*,y.KaID')
+            ->field('u.*,y.KaID,r.type')
             ->join('kx_jc_yonghuka y','u.UserID=y.UserID','left')
-            ->where('KaID',null)
+            ->join('kx_php_role r','r.id=u.RoleId','left')
+            ->where(['KaID'=>null,'type'=>2])
             ->select();
         $list = collection($list)->toArray();
         $end = getMicrotime();
@@ -446,6 +492,47 @@ class Room extends Base
         return $this->sendSuccess(($end-$start),$list);
     }
 
+    /**
+     * @title 获取门锁列表(GET)
+     * @readme /doc/md/api/Device/getLockList.md
+     */
+    public function getLockList(Request $request){
+        $start = getMicrotime();
+        $result = curl_post_https('http://127.0.0.1:15511/getdoorlocklist',['apikey'=>md5('apikey'.date('Y-m-d'))]);
+        $result = json_decode($result);
+        if ($result->code == 0) {
+            $end = getMicrotime();
+            return $this->sendSuccess(($end - $start),$result->data->list);
+        }else {
+            $end = getMicrotime();
+            return $this->sendError(($end - $start));
+        }
+    }
+
+    /**
+     * @title 开关门锁(GET)
+     * @readme /doc/md/api/Device/openremotedevicelock.md
+     */
+    public function openremotedevicelock(Request $request){
+        $start = getMicrotime();
+        $data = $request->get();
+        $Device_id = 'A74E0A7A';
+        if (empty($Device_id)) {
+            $end = getMicrotime();
+            return $this->sendError(($end - $start),1,'未传门锁id');
+        }
+        $data['apikey'] = md5('apikey'.date('Y-m-d'));
+        $result = curl_post_https('http://127.0.0.1:15511/openremotedevicelock',$data);
+        $result = json_decode($result);
+        if ($result->code == 0) {
+            $end = getMicrotime();
+            return $this->sendSuccess(($end - $start),$result);
+        }else {
+            $end = getMicrotime();
+            return $this->sendError(($end - $start));
+        }
+    }
+
 
 
 
@@ -475,11 +562,11 @@ class Room extends Base
                 'Type' => ['name' => 'Type', 'type' => 'integer', 'require' => 'false', 'default' => '', 'desc' => '1,楼层,2,房间', 'range' => '',],
             ],
             'edit' => [
-                'id' => ['name' => 'id', 'type' => 'array', 'require' => 'true', 'default' => '', 'desc' => 'id', 'range' => '',],
-                'genre' => ['name' => 'genre', 'type' => 'array', 'require' => 'true', 'default' => '', 'desc' => '房间类型', 'range' => '',],
+                'SuSheID' => ['name' => 'SuSheID', 'type' => 'array', 'require' => 'true', 'default' => '', 'desc' => '宿舍id', 'range' => '',],
+                'genre' => ['name' => 'genre', 'type' => 'array', 'require' => 'true', 'default' => '', 'desc' => '房间类型(1,单间,2标间,3套房)', 'range' => '',],
             ],
             'delete' => [
-                'id' => ['name' => 'id', 'type' => 'array', 'require' => 'true', 'default' => '', 'desc' => 'id', 'range' => '',],
+                'SuSheID' => ['name' => 'SuSheID', 'type' => 'array', 'require' => 'true', 'default' => '', 'desc' => 'SuSheID', 'range' => '',],
             ],
             'floorList' => [
             ],
@@ -503,11 +590,24 @@ class Room extends Base
             ],
             'getCards' => [
             ],
+            'getCardInfo' => [
+                'KaID' => ['name' => 'KaID', 'type' => 'integer', 'require' => 'true', 'default' => '', 'desc' => '卡号', 'range' => '',],
+            ],
             'deleteCard' => [
+                'DoorLockNO' => ['name' => 'DoorLockNO', 'type' => 'string', 'require' => 'true', 'default' => '', 'desc' => '门锁号', 'range' => '',],
+                'DecKaID' => ['name' => 'DecKaID', 'type' => 'string', 'require' => 'true', 'default' => '', 'desc' => '物理卡号', 'range' => '',],
             ],
             'rommList'=>[
                  'floor' => ['name' => 'floor', 'type' => 'string', 'require' => 'true', 'default' => '', 'desc' => '楼层id', 'range' => '',],
-            ]
+            ],
+            'getLockList'=>[
+                 'floor' => ['name' => 'floor', 'type' => 'string', 'require' => 'true', 'default' => '', 'desc' => '楼层id', 'range' => '',],
+            ],
+            'openremotedevicelock'=>[
+                 'Device_id' => ['name' => 'Device_id', 'type' => 'string', 'require' => 'true', 'default' => '', 'desc' => '门锁号', 'range' => '',],
+                 'OpenCloseAction' => ['name' => 'OpenCloseAction', 'type' => 'integer', 'require' => 'true', 'default' => '1', 'desc' => '开门1 关门0，可选 默认 1', 'range' => '',],
+            ],
+
         ];
         //可以合并公共参数
         return $rules;

@@ -83,6 +83,12 @@ abstract class ApiController
      */
     public function __construct(Request $request = null)
     {
+        header('Access-Control-Allow-Origin: *');
+        header("Access-Control-Allow-Headers: authorization,Origin, X-Requested-With, Content-Type, Accept");
+        header('Access-Control-Allow-Methods: POST,GET');
+        if (request()->isOptions()) {
+            exit();
+        }
         $this->_init();
 
     }

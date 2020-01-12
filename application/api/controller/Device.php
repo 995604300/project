@@ -23,7 +23,6 @@ class Device extends Base
     //附加方法
     protected $extraActionList = [
         'setCheckTime'
-
     ];
     //跳过鉴权的方法
     protected $skipAuthActionList = [];
@@ -44,7 +43,7 @@ class Device extends Base
        $where = [];
 
        $type = $request->get('type');
-       if (empty($type)) {
+       if (!empty($type)) {
            $where['type'] = $type;
        }
        $list = $this
@@ -65,14 +64,20 @@ class Device extends Base
    public function save(Request $request){
        $start = getMicrotime();
        $array_data = $request->post();
-       $result = $this->device_model->allowField(true)->isUpdate(TRUE)->save($array_data);
-       if ($result) {
-           $end = getMicrotime();
-           return $this->sendSuccess(($end - $start));
-       } else {
-           $end = getMicrotime();
-           return $this->sendError(($end - $start));
+       foreach ($array_data['data'] as $key=>$value){
+           if (empty($value['Id']) || empty($value['sbID']) || empty($value['Title']) || empty($value['IP'])) {
+               $end = getMicrotime();
+               return $this->sendError(($end - $start),1,'参数错误!');
+           }
+           $save_data = [
+               'sbID' => $value['sbID'],
+               'Title' => $value['Title'],
+               'IP' => $value['IP']
+           ];
+           $this->device_model->where('Id', $value['Id'])->update($save_data);
        }
+       $end = getMicrotime();
+       return $this->sendSuccess(($end - $start));
    }
 
     /**
@@ -94,7 +99,113 @@ class Device extends Base
    }
 
 
+    public function test(Request $request)
+    {
+        //这里写业务逻辑.推荐使用方法调用的形式。例如模型中的方法
+        $statistics_model = new Statistics();
+        $user_model = new User();
+        $violation_log = []; //违规记录
+        $date = date('Y-m-d');
+        $date = '2019-12-28';
+        $start_time =  $date . ' 00:00:00';
+        $end_time = $date . ' 23:59:59';
+        $where['recordDate'] = [['>',$start_time],['<',$end_time ]];
 
+
+        //获取门禁,食堂,房间的考勤时间
+        $check_time = Db::table('kx_php_check_time')->select();
+        $check_time = collection($check_time)->toArray();
+        foreach ($check_time as $value) {
+            if ($value['type'] == 1) {
+                $door_check_time = [
+                    'startTime'=>$date.' '.explode('.',$value['startTime'])[0],
+                    'endTime'=>$date.' '.explode('.',$value['endTime'])[0],
+                ];
+            }elseif($value['type'] == 2) {
+                $shitang_check_time[] = [
+                    'startTime'=>$date.' '.explode('.',$value['startTime'])[0],
+                    'endTime'=>$date.' '.explode('.',$value['endTime'])[0],
+                ];
+            } else {
+                $room_check_time = [
+                    'startTime'=>$date.' '.explode('.',$value['startTime'])[0],
+                    'endTime'=>$date.' '.explode('.',$value['endTime'])[0],
+                ];
+            }
+        }
+
+
+        // 获取客房打卡违规记录
+        $room_log = $statistics_model
+            ->where(['RoleId'=>3,'Types'=>4])
+            ->where(function($query) use ($room_check_time,$start_time,$end_time){
+                $query->where('recordDate','between',[$start_time,$room_check_time['startTime']])
+                      ->whereOr('recordDate','between',[$room_check_time['endTime'],$end_time]);
+            })
+            ->select();
+        $room_log = collection($room_log)->toArray();
+        foreach ($room_log as $value) {
+            $value ['message'] = '客房打卡违规';
+            $violation_log[] = $value;
+        }
+
+        //
+        //获取门禁考勤违规记录
+        $door_log = $statistics_model
+            ->where(['RoleId'=>3,'Types'=>2])
+            ->where(function($query) use ($door_check_time,$start_time,$end_time){
+                $query->where('recordDate','between',[$start_time,$door_check_time['startTime']])
+                      ->whereOr('recordDate','between',[$door_check_time['endTime'],$end_time]);
+            })
+            ->select();
+        $door_log = collection($door_log)->toArray();
+        foreach ($door_log as $value) {
+            $value ['message'] = '门禁打卡违规';
+            $violation_log[] = $value;
+        }
+
+        //
+        //获取当天全部学生数据以及需要参与课程数据
+        $user = $user_model
+            ->with([
+                       'classes'=>function($query) use ($date) {
+                           $query->with([
+                                            'lessonClass'=>function($query) use ($date)
+                                            {$query->field('l.*')->join('kx_php_lesson l','lessonId=l.id')->where('date', $date);
+                                            }]
+                           );}
+                   ])
+            ->where('roleId',3)
+            ->select();
+        $user = collection($user)->toArray();
+
+        foreach ($user as $value){
+            $shitang_log = $statistics_model->where(['UserID'=>$value['UserID'],'Types'=>1,'recordDate'=>['between',[$start_time,$end_time]]])->select();
+            $shitang_log = collection($shitang_log)->toArray();
+
+            foreach ($shitang_check_time as $val) {
+
+                $res = array_filter($shitang_log, function($v) use ($val) { return strtotime($v[0]) >= strtotime($val['startTime']) && strtotime($v[0]) <= strtotime($val['endTime']);});
+
+                if (!$res) {
+                    $violation_log[] = [
+                        'UserID'=>$value['UserID'],
+                        'UserName'=>$value['UserName'],
+                        'RealName'=>$value['RealName'],
+                        'RoleId'=>$value['RoleId'],
+                        'IDCard'=>$value['IDCard'],
+                        'message'=>$val['startTime'].' - '.$val['endTime'].'食堂考勤未打卡'
+                    ];
+                }
+            }
+
+            foreach ($value['classes']['lesson_class'] as $val) {
+
+                $res = Db::table('kx_kq_record')->field('a.time AS recordDate, b.UserID, b.UserName, b.UserCode, b.RealName, b.RoleId, b.ClassId, b.IDCard, a.sbID AS sbID')->alias('a')->join('kx_sb_guanli f','a.sbID = f.sbID')->join('kx_jc_user b','a.KaID = b.UserCode')->where(['recordDate'=>['between',[$start_time,$end_time]]])->select();
+
+            }
+        }
+    }
 
     /**
      * 参数规则
@@ -113,7 +224,7 @@ class Device extends Base
                 'type' => ['name' => 'type', 'type' => 'string', 'require' => 'false', 'default' => '', 'desc' => '', 'range' => '',],
             ],
             'save' => [
-                'id' => ['name' => 'id', 'type' => 'integer', 'require' => 'true', 'default' => '', 'desc' => '', 'range' => '',],
+                'Id' => ['name' => 'Id', 'type' => 'integer', 'require' => 'true', 'default' => '', 'desc' => '', 'range' => '',],
                 'Title' => ['name' => 'Title', 'type' => 'string', 'require' => 'true', 'default' => '', 'desc' => '设备名称', 'range' => '',],
                 'sbID' => ['name' => 'sbID', 'type' => 'string', 'require' => 'true', 'default' => '', 'desc' => '序列号', 'range' => '',],
                 'IP' => ['name' => 'IP', 'type' => 'string', 'require' => 'true', 'default' => '', 'desc' => 'ip地址', 'range' => '',],
