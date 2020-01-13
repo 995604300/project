@@ -14,7 +14,7 @@ class WorkerMan extends Controller
         // 心跳间隔55秒
         define('HEARTBEAT_TIME', 30);
         //websocket url
-        $socket_url = '192.168.0.107:2000';
+        $socket_url = config('socket_url');
         // 初始化一个worker容器，监听1234端口
         $worker = new Worker('websocket://'.$socket_url);
         // 新增加一个属性，用来保存uid到connection的映射
@@ -26,7 +26,7 @@ class WorkerMan extends Controller
         $worker->count = 1;
         // worker进程启动后创建一个text Worker以便打开一个内部通讯端口
         $worker->onWorkerStart = function ($worker) {
-            $inner_text_url ='192.168.0.107:2001';
+            $inner_text_url = config('inner_url');
             // 开启一个内部端口，方便内部系统推送数据，Text协议格式 文本+换行符
             $inner_text_worker = new Worker('text://'. $inner_text_url);
             $inner_text_worker->onMessage = function ($connection, $buffer) {
@@ -36,7 +36,7 @@ class WorkerMan extends Controller
                 if(!empty($data['sn'])){
                     $number = $this->sendMessageByUid($data['sn'],$buffer);
                 }else{
-                    // 通过workerman，向uid的页面推送数据
+                     //通过workerman，向uid的页面推送数据
                     $number = $this->broadcast($buffer);
                 }
 
@@ -81,7 +81,7 @@ class WorkerMan extends Controller
                 */
                 $worker->uidConnections[$connection->uid] = $connection;
                 try {
-                    $this->line($connection->uid);
+//                    $this->line($connection->uid);
                 } catch (\Exception $e) { }
                 return;
             }

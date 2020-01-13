@@ -28,7 +28,7 @@ class Plate extends Base
         'publicUpload',
     ];
     //跳过鉴权的方法
-    protected $skipAuthActionList = ['index'];
+    protected $skipAuthActionList = ['setMessage'];
     protected $plate_model;
     protected $device_model;
 
@@ -138,9 +138,7 @@ class Plate extends Base
        }
        $res = Db::table('kx_php_plate_message')->where('id',1)->update($save_array);
        if ($res) {
-           $data = Db::table('kx_php_plate_message')
-                    ->find(['id'=>1]);
-           Push($data);
+           Push(['info'=>'isUpdate']);
            $end = getMicrotime();
            return $this->sendSuccess(($end - $start));
        }

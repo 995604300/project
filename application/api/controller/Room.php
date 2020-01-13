@@ -36,9 +36,11 @@ class Room extends Base
         'rommList',
         'getCards',
         'getCardInfo',
+        'getLockList',
+        'openremotedevicelock'
     ];
     //跳过鉴权的方法
-    protected $skipAuthActionList = ['getLockList'];
+    protected $skipAuthActionList = ['getRoomInfo'];
     protected $room_model;
     protected $ka_model;
     protected $user_model;
@@ -391,7 +393,7 @@ class Room extends Base
         $array_data['KaiShiShiJian'] = date('Y-m-d H:i:s');
         $result = Db::table('kx_jc_yonghuka')->insert($array_data);
         if ($result) {
-            $this->user_model->save(['UserID'=>$array_data['UserID'],'UserCode'=>$array_data['KaID']]);
+            $this->user_model->save(['UserCode'=>$array_data['KaID']],['UserID'=>$array_data['UserID']]);
             $end = getMicrotime();
             return $this->sendSuccess(($end - $start));
         } else {
@@ -412,10 +414,20 @@ class Room extends Base
         $array_data = $request->post();
         if (empty($array_data['UserID'] || empty($array_data['KaID']))) {
             $end = getMicrotime();
-            return $this->sendError(($end - $start),1,'参数错误!');
+            return $this->sendError(($end - $start), 1, '参数错误!');
         }
-
-        $result = Db::name('kx_jc_yonghuka')->where($array_data)->delete();
+        $res = curl_post_https('http://127.0.0.1:15511/getlibraryreaderinfo', ['apikey' => md5('apikey' . date('Y-m-d')), 'readerCode' => $array_data['KaID']]);
+        $res = json_decode($res);
+        if ($res->code == 0) {
+            if (!empty($res->borrowlist)) {
+                $end = getMicrotime();
+                return $this->sendError(($end - $start), 1, '有图书未归还,请归还!');
+            }
+            $result = Db::table('kx_jc_yonghuka')->where($array_data)->delete();
+        }
+        else {
+            $result = FALSE;
+        }
 
         if ($result) {
             $end = getMicrotime();
@@ -516,10 +528,9 @@ class Room extends Base
     public function openremotedevicelock(Request $request){
         $start = getMicrotime();
         $data = $request->get();
-        $Device_id = 'A74E0A7A';
-        if (empty($Device_id)) {
+        if (empty($data['Device_id'])) {
             $end = getMicrotime();
-            return $this->sendError(($end - $start),1,'未传门锁id');
+            return $this->sendError(($end - $start),1,'未传门锁号');
         }
         $data['apikey'] = md5('apikey'.date('Y-m-d'));
         $result = curl_post_https('http://127.0.0.1:15511/openremotedevicelock',$data);
@@ -601,7 +612,7 @@ class Room extends Base
                  'floor' => ['name' => 'floor', 'type' => 'string', 'require' => 'true', 'default' => '', 'desc' => '楼层id', 'range' => '',],
             ],
             'getLockList'=>[
-                 'floor' => ['name' => 'floor', 'type' => 'string', 'require' => 'true', 'default' => '', 'desc' => '楼层id', 'range' => '',],
+
             ],
             'openremotedevicelock'=>[
                  'Device_id' => ['name' => 'Device_id', 'type' => 'string', 'require' => 'true', 'default' => '', 'desc' => '门锁号', 'range' => '',],

@@ -26,11 +26,15 @@ class Task extends Command{
         $user_model = new User();
         $violation_log = []; //违规记录
         $date = date('Y-m-d',strtotime("-1 day"));
-        $date = '2020-01-06';
         $start_time =  $date . ' 00:00:00';
         $end_time = $date . ' 23:59:59';
         $where['recordDate'] = [['>',$start_time],['<',$end_time ]];
-
+        $dev_info = Db::table('kx_sb_guanli')->where('type','ZKT_CM20')->select();
+        $dev_info = collection($dev_info)->toArray();
+        //同步消费数据
+        $res = $this->curl_post_https('http://127.0.0.1:15511/syncconsumerdata', ['apikey' => md5('apikey' . date('Y-m-d')), 'dev_info' => $dev_info,'downloadall'=>0]);
+        $res = json_decode($res);
+        var_dump($res);exit;
 
         //获取门禁,食堂,房间的考勤时间
         $check_time = Db::table('kx_php_check_time')->select();
@@ -136,49 +140,73 @@ class Task extends Command{
                     ];
                 }
             }
-            foreach ($value['classes']['lesson_class'] as $val) {
-                $startTime = $val['date']. ' '.$val['startTime'];
-                $endTime = $val['date']. ' '.$val['endTime'];
-                $startTime = strtotime($startTime);
-                $endTime = strtotime($endTime);
-                $plate_log =  $statistics_model
-                    ->alias('a')
-                    ->field('a.*,p.classroomId')
-                    ->join('kx_php_plate p','a.sbID=p.sbID')
-                    ->where(['UserID'=>$value['UserID'],'Types'=>3,'recordDate'=>['between',[$start_time,$end_time]]])
-                    ->select();
-                $plate_log = collection($plate_log)->toArray();
-                $res = array_filter($plate_log, function($v) use ($startTime,$endTime) { return strtotime($v['recordDate']) >= $startTime-3600  && strtotime($v['recordDate']) <= $startTime;});
-                if (!$res){
-                    $res1 = array_filter($plate_log, function($v) use ($startTime,$endTime) { return strtotime($v['recordDate']) >= $startTime  && strtotime($v['recordDate']) <= $endTime;});
-                    if ($res1){
-                        $violation_log[] = [
-                            'type'=>3,
-                            'date'=>$date,
-                            'UserID'=>$value['UserID'],
-                            'UserName'=>$value['UserName'],
-                            'RealName'=>$value['RealName'],
-                            'RoleId'=>$value['RoleId'],
-                            'IDCard'=>$value['IDCard'],
-                            'message'=>$val['lessonName'].'课程迟到'
-                        ];
-                    } else {
-                        $violation_log[] = [
-                            'type'=>3,
-                            'date'=>$date,
-                            'UserID'=>$value['UserID'],
-                            'UserName'=>$value['UserName'],
-                            'RealName'=>$value['RealName'],
-                            'RoleId'=>$value['RoleId'],
-                            'IDCard'=>$value['IDCard'],
-                            'message'=>$val['lessonName'].'课程旷课'
-                        ];
+            if (!empty($value['classes']['lesson_class'])) {
+                foreach ($value['classes']['lesson_class'] as $val) {
+                    $startTime = $val['date']. ' '.$val['startTime'];
+                    $endTime = $val['date']. ' '.$val['endTime'];
+                    $startTime = strtotime($startTime);
+                    $endTime = strtotime($endTime);
+                    $plate_log =  $statistics_model
+                        ->alias('a')
+                        ->field('a.*,p.classroomId')
+                        ->join('kx_php_plate p','a.sbID=p.sbID')
+                        ->where(['UserID'=>$value['UserID'],'Types'=>3,'recordDate'=>['between',[$start_time,$end_time]]])
+                        ->select();
+                    $plate_log = collection($plate_log)->toArray();
+                    $res = array_filter($plate_log, function($v) use ($startTime,$endTime) { return strtotime($v['recordDate']) >= $startTime-3600  && strtotime($v['recordDate']) <= $startTime;});
+                    if (!$res){
+                        $res1 = array_filter($plate_log, function($v) use ($startTime,$endTime) { return strtotime($v['recordDate']) >= $startTime  && strtotime($v['recordDate']) <= $endTime;});
+                        if ($res1){
+                            $violation_log[] = [
+                                'type'=>3,
+                                'date'=>$date,
+                                'UserID'=>$value['UserID'],
+                                'UserName'=>$value['UserName'],
+                                'RealName'=>$value['RealName'],
+                                'RoleId'=>$value['RoleId'],
+                                'IDCard'=>$value['IDCard'],
+                                'message'=>$val['lessonName'].'课程迟到'
+                            ];
+                        } else {
+                            $violation_log[] = [
+                                'type'=>3,
+                                'date'=>$date,
+                                'UserID'=>$value['UserID'],
+                                'UserName'=>$value['UserName'],
+                                'RealName'=>$value['RealName'],
+                                'RoleId'=>$value['RoleId'],
+                                'IDCard'=>$value['IDCard'],
+                                'message'=>$val['lessonName'].'课程旷课'
+                            ];
+                        }
                     }
                 }
             }
         }
 
         Db::table('kx_php_violation')->insertAll($violation_log);
+    }
+
+
+    /* PHP CURL HTTPS POST */
+    protected function curl_post_https($url, $data = []){ // 模拟提交数据函数
+        $curl = curl_init();  //初始化
+        curl_setopt($curl,CURLOPT_URL,$url);  //设置url
+        curl_setopt($curl,CURLOPT_HTTPAUTH,CURLAUTH_BASIC);  //设置http验证方法
+        curl_setopt($curl,CURLOPT_HEADER,0);  //设置头信息
+        curl_setopt($curl,CURLOPT_RETURNTRANSFER,1);  //设置curl_exec获取的信息的返回方式
+        curl_setopt($curl,CURLOPT_POST,1);  //设置发送方式为post请求
+        curl_setopt($curl, CURLOPT_POSTFIELDS,json_encode($data));// 必须为字符串
+        //    curl_setopt($curl,CURLOPT_POSTFIELDS,$data);  //设置post的数据
+
+        $result = curl_exec($curl);
+        if($result === false){
+            echo curl_errno($curl);
+            var_dump(curl_error($curl));
+            exit();
+        }
+        curl_close($curl);
+        return $result;
     }
 
 }

@@ -71,7 +71,7 @@ class Lesson extends Base
                ->field('l.*,cr.classroomName')
                ->join('kx_php_classroom cr','l.classroomId=cr.id','left')
                ->where($where)
-               ->order(['date','startTime'])
+               ->order(['date DESC','startTime ASC'])
                ->select();
        }
        if ($list) {
@@ -116,6 +116,7 @@ class Lesson extends Base
                }
                $this->lesson_class_model->isUpdate(FALSE)->saveAll($save_data);
            }
+           Push(['info'=>'isUpdate']);
            $end = getMicrotime();
            return $this->sendSuccess(($end - $start));
        } else {

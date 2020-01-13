@@ -26,7 +26,7 @@ class User extends Base
 
     ];
     //跳过鉴权的方法
-    protected $skipAuthActionList = [];
+    protected $skipAuthActionList = ['save'];
     protected $user_model;
 
     public function __construct()
@@ -105,6 +105,20 @@ class User extends Base
            return $this->sendError(($end - $start));
        }
    }
+   public function save(Request $request){
+       $start = getMicrotime();
+       $save_data = $request->post();
+       $result = $this->user_model->save($save_data);
+
+       if ($result) {
+           $end = getMicrotime();
+           return $this->sendSuccess(($end - $start));
+       } else {
+           $end = getMicrotime();
+           return $this->sendError(($end - $start));
+       }
+   }
+
 
     /**
      * @title 用户删除

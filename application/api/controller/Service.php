@@ -36,6 +36,8 @@ class Service extends HproseController
                 return $this->get_message($arg);
             case 'BANNER':
                 return $this->get_banner($arg);
+            case 'NOWLESSON':
+                return $this->get_now_lesson($arg);
         }
 
 
@@ -63,12 +65,45 @@ class Service extends HproseController
         if (!empty($sn)) {
             $plate_model =  Model('Plate');
             $res = $plate_model
-                ->with(['lesson'=>function($query){
-                    $query->order('date')->order('startTime');
+                ->alias('a')
+                ->field('l.date,l.classroomId,l.week')
+                ->join('kx_php_lesson l','a.classroomId=l.classroomId')
+                ->where('sbID',$sn)
+                ->order('date')
+                ->group('l.date,l.classroomId,l.week')
+                ->select();
+            if ($res) {
+                $data = collection($res)->toArray();
+                foreach ($data as $key=>$value) {
+                    $result = Db::table('kx_php_lesson')->where(['date'=>$value['date'],'classroomId'=>$value['classroomId']])->order('startTime')->select();
+                    $data[$key]['lesson'] = collection($result)->toArray();
+                }
+            } else {
+                $data = [];
+            }
+
+            return json(['data'=>$data]);
+        } else {
+            return json(['message'=>'请传递班牌序列号']);
+        }
+    }
+
+    public function get_now_lesson($arg = []) {
+        $sn = $arg['sn'];
+        if (!empty($sn)) {
+            $plate_model =  Model('Plate');
+            $date = date('Y-m-d');
+            $res = $plate_model
+                ->with(['lesson'=>function($query) use ($date){
+                    $query->order('date')->order('startTime')->where('date',$date);
                 }])
                 ->where('sbID',$sn)
-                ->find()
-                ->toArray();
+                ->find();
+            if ($res) {
+                $res = $res->toArray();
+            }else {
+                $res = [];
+            }
             return json(['data'=>$res]);
         } else {
             return json(['message'=>'请传递班牌序列号']);
@@ -85,7 +120,11 @@ class Service extends HproseController
     public function get_banner($arg = []) {
             $res = Db::table('kx_php_plate_banner')
                 ->select();
-            $res = collection($res)->toArray();
+            if ($res) {
+                $res = collection($res)->toArray();
+            } else {
+                $res = [];
+            }
             return json(['data'=>$res]);
 
     }

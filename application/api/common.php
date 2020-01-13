@@ -213,7 +213,6 @@ function rand_str($length = 1, $chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ') //abcdefgh
 function Push($data,$sn = null)
 {
     $inner_text_url = config('inner_url');
-    var_dump($inner_text_url);exit;
     // 建立socket连接到内部推送端口
     $client = stream_socket_client('tcp://' . $inner_text_url, $errno, $errmsg, 1);
     // 推送的数据，包含uid字段，表示是给这个uid推送

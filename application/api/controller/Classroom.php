@@ -25,7 +25,7 @@ class Classroom extends Base
 
     ];
     //跳过鉴权的方法
-    protected $skipAuthActionList = [];
+    protected $skipAuthActionList = ['save'];
     protected $classroom_model;
 
     public function __construct()
@@ -78,6 +78,7 @@ class Classroom extends Base
        }
 
        if ($result) {
+           Push(['info'=>'isUpdate']);
            $end = getMicrotime();
            return $this->sendSuccess(($end - $start));
        } else {
