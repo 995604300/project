@@ -40,7 +40,7 @@ class Room extends Base
         'openremotedevicelock'
     ];
     //跳过鉴权的方法
-    protected $skipAuthActionList = ['getRoomInfo'];
+    protected $skipAuthActionList = ['getRoomUser'];
     protected $room_model;
     protected $ka_model;
     protected $user_model;
@@ -227,6 +227,34 @@ class Room extends Base
     }
 
     /**
+     * @title 获取入住房间用户数据
+     * @param Request $request
+     * @throws \think\Exception
+     * author: Wang YX
+     * @readme /doc/md/api/Room/getRoomUser.md
+     */
+    public function getRoomUser(Request $request){
+        $start = getMicrotime();
+        $SuSheID = $request->get('SuSheID');
+        if (empty($SuSheID)) {
+            $end = getMicrotime();
+            return $this->sendError(($end - $start),1,'参数错误！');
+        }
+        $user_res = $this->room_model
+                 ->alias('r')
+                 ->field('r.*,u.UserID,u.UserCode,u.UserName,k.KaID,k.KaName,a.DecKaID,u.RealName,u.PhoneNum,u.ClassId,u.RoleId,u.sex')
+                 ->join('kx_jc_SuShe_DoorLock_Arrange a','r.DoorLockNO=a.DoorLockNO')
+                 ->join('kx_jc_ka k','a.DecKaID=k.DecKaID')
+                 ->join('kx_jc_yonghuka y','k.KaID=y.KaID')
+                 ->join('kx_jc_user u','y.UserID=u.UserID')
+                 ->where('SuSheID',$SuSheID)
+                 ->select();
+        $list = collection($user_res)->toArray();
+        $end = getMicrotime();
+        return $this->sendSuccess(($end-$start),$list);
+    }
+
+    /**
      * @title 获取未绑定房间的房间卡
      * @param Request $request
      * @throws \think\Exception
@@ -337,7 +365,7 @@ class Room extends Base
     }
 
     /**
-     * @title 去除卡与客房的关联
+     * @title 去除卡与客房的关联(POST)
      * @param Request $request
      * @throws \think\Exception
      * author: Wang YX
@@ -389,6 +417,7 @@ class Room extends Base
             $end = getMicrotime();
             return $this->sendError(($end - $start),1,'参数错误!');
         }
+        Db::table('kx_jc_yonghuka')->where('UserID',$array_data['UserID'])->delete();
         $array_data['JieShuShiJian'] = '2099-12-31 00:00:00.000';
         $array_data['KaiShiShiJian'] = date('Y-m-d H:i:s');
         $result = Db::table('kx_jc_yonghuka')->insert($array_data);
@@ -426,7 +455,8 @@ class Room extends Base
             $result = Db::table('kx_jc_yonghuka')->where($array_data)->delete();
         }
         else {
-            $result = FALSE;
+             $end = getMicrotime();
+        return $this->sendError(($end - $start),1,'图书馆记录查询失败');
         }
 
         if ($result) {
@@ -450,10 +480,11 @@ class Room extends Base
         $list = $this->user_model
             ->with('classes')
             ->alias('u')
-            ->field('u.*,y.KaID,r.type')
+            ->field('u.*,k.KaID,r.type')
             ->join('kx_jc_yonghuka y','u.UserID=y.UserID','left')
+            ->join('kx_jc_ka k','y.KaID=k.KaID','left')
             ->join('kx_php_role r','r.id=u.RoleId','left')
-            ->where(['KaID'=>null,'type'=>2])
+            ->where(['k.KaID'=>null,'type'=>2])
             ->select();
         $list = collection($list)->toArray();
         $end = getMicrotime();

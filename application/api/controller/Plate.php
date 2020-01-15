@@ -136,8 +136,14 @@ class Plate extends Base
            $end = getMicrotime();
            return $this->sendError(($end - $start),1,'参数错误!');
        }
-       $res = Db::table('kx_php_plate_message')->where('id',1)->update($save_array);
-       if ($res) {
+       $res = Db::table('kx_php_plate_message')->where('id',1)->find();
+       if ($res){
+           $result = Db::table('kx_php_plate_message')->where('id',1)->update($save_array);
+       } else {
+           $save_array['id'] = 1;
+           $result = Db::table('kx_php_plate_message')->insert($save_array);
+       }
+       if ($result) {
            Push(['info'=>'isUpdate']);
            $end = getMicrotime();
            return $this->sendSuccess(($end - $start));
@@ -207,7 +213,7 @@ class Plate extends Base
             $file_url = [
                 'ext' => $info->getExtension(),
                 'file_name' => $info->getFilename(),
-                'file_url' => config("http_url"). DS . 'uploads' . DS . $info->getSaveName()
+                'file_url' => DS . 'uploads' . DS . $info->getSaveName()
             ];
             $end = getMicrotime();
             return $this->sendSuccess(($end - $start), $file_url);

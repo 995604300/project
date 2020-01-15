@@ -22,10 +22,13 @@ class Device extends Base
 {
     //附加方法
     protected $extraActionList = [
-        'setCheckTime'
+        'checkList',
+        'setCheckTime',
+        'synchronous',
+        'clearData',
     ];
     //跳过鉴权的方法
-    protected $skipAuthActionList = [];
+    protected $skipAuthActionList = ['setCheckTime','checkList'];
     protected $device_model;
 
     public function __construct()
@@ -81,6 +84,28 @@ class Device extends Base
    }
 
     /**
+     * @title 考勤时间列表
+     * @readme /doc/md/api/Device/checkList.md
+     */
+    public function checkList(Request $request){
+        $start = getMicrotime();
+        $type = $request->get('type');
+        $where = [];
+        if (!empty($type)){
+            $where['type'] = $type;
+        }
+        $result = Db::table('kx_php_check_time')->where($where)->select();
+
+        if ($result) {
+            $result = collection($result)->toArray();
+        } else {
+            $result = [];
+        }
+        $end = getMicrotime();
+        return $this->sendSuccess(($end - $start),$result);
+    }
+
+    /**
      * @title 考勤时间设置
      * @readme /doc/md/api/Device/setCheckTime.md
      */
@@ -88,7 +113,11 @@ class Device extends Base
        $start = getMicrotime();
        $array_data = $request->post();
 
-       $result = Db::table('kx_php_check_time')->insert($array_data);
+       if (empty($array_data['id'])) {
+           $result = Db::table('kx_php_check_time')->insert($array_data);
+       } else {
+           $result = Db::table('kx_php_check_time')->update($array_data);
+       }
        if ($result) {
            $end = getMicrotime();
            return $this->sendSuccess(($end - $start));
@@ -99,112 +128,74 @@ class Device extends Base
    }
 
 
-    public function test(Request $request)
+    /**
+     * @title  同步小麦,消费机,门禁用户以及设备数据
+     * @readme /doc/md/api/Device/synchronous.md
+     */
+    public function synchronous(Request $request)
     {
-        //这里写业务逻辑.推荐使用方法调用的形式。例如模型中的方法
-        $statistics_model = new Statistics();
-        $user_model = new User();
-        $violation_log = []; //违规记录
-        $date = date('Y-m-d');
-        $date = '2019-12-28';
-        $start_time =  $date . ' 00:00:00';
-        $end_time = $date . ' 23:59:59';
-        $where['recordDate'] = [['>',$start_time],['<',$end_time ]];
+        $start = getMicrotime();
+        //用户数据
+        $user_list = Db::table('kx_jc_user u')->join('kx_php_role r','u.RoleId=r.id')->where('type',2)->select();
+        $user_list = collection($user_list)->toArray();
+
+        //小麦人脸设备数据
+        $dev_info = Db::table('kx_sb_guanli')->where('type','XA_FACE')->select();
+        $dev_info = collection($dev_info)->toArray();
+        $message = '';
+        $res = curl_post_https('http://127.0.0.1:15511/syncXAfaceDevicesUser', ['apikey' => md5('apikey' . date('Y-m-d')), 'dev_info' => $dev_info,'userlist'=>$user_list,'updateall'=>0]);
+        $res = json_decode($res);
+        $message .= '通过事件单号['.$res->data->log_no.',';
+
+        //小麦人脸设备数据
+        $dev_info = Db::table('kx_sb_guanli')->where('type','ZKT_CM20')->select();
+        $dev_info = collection($dev_info)->toArray();
+
+        $res = curl_post_https('http://127.0.0.1:15511/syncConsumerMachineUser', ['apikey' => md5('apikey' . date('Y-m-d')), 'dev_info' => $dev_info,'userlist'=>$user_list,'updateall'=>0]);
+        $res = json_decode($res);
+        $message .= $res->data->log_no.',';
+
+        //小麦人脸设备数据
+        $dev_info = Db::table('kx_sb_guanli')->where('type','ZKT_INBLO46')->select();
+        $dev_info = collection($dev_info)->toArray();
+
+        $res = curl_post_https('http://127.0.0.1:15511/syncAccessControlUser', ['apikey' => md5('apikey' . date('Y-m-d')), 'dev_info' => $dev_info,'updateall'=>0]);
+        $res = json_decode($res);
+        $message .= $res->data->log_no.']查询同步数据执行情况!';
 
 
-        //获取门禁,食堂,房间的考勤时间
-        $check_time = Db::table('kx_php_check_time')->select();
-        $check_time = collection($check_time)->toArray();
-        foreach ($check_time as $value) {
-            if ($value['type'] == 1) {
-                $door_check_time = [
-                    'startTime'=>$date.' '.explode('.',$value['startTime'])[0],
-                    'endTime'=>$date.' '.explode('.',$value['endTime'])[0],
-                ];
-            }elseif($value['type'] == 2) {
-                $shitang_check_time[] = [
-                    'startTime'=>$date.' '.explode('.',$value['startTime'])[0],
-                    'endTime'=>$date.' '.explode('.',$value['endTime'])[0],
-                ];
-            } else {
-                $room_check_time = [
-                    'startTime'=>$date.' '.explode('.',$value['startTime'])[0],
-                    'endTime'=>$date.' '.explode('.',$value['endTime'])[0],
-                ];
-            }
+        $end = getMicrotime();
+        return $this->sendSuccess(($end - $start),[],$message);
+    }
+
+    /**
+     * @title  获取事件执行情况
+     * @readme /doc/md/api/Device/getLogInfo.md
+     */
+    public function getLogInfo(Request $request)
+    {
+        $start = getMicrotime();
+        $log_no = $request->get('log_no');
+        if (empty($log_no)) {
+            $end = getMicrotime();
+            return $this->sendError(($end - $start),1,'请输入事件单号');
         }
+        $res = Db::table('kx_jc_OperationLog')->where('log_no',$log_no)->find();
+        $end = getMicrotime();
+        return $this->sendSuccess(($end - $start),$res);
+    }
 
 
-        // 获取客房打卡违规记录
-        $room_log = $statistics_model
-            ->where(['RoleId'=>3,'Types'=>4])
-            ->where(function($query) use ($room_check_time,$start_time,$end_time){
-                $query->where('recordDate','between',[$start_time,$room_check_time['startTime']])
-                      ->whereOr('recordDate','between',[$room_check_time['endTime'],$end_time]);
-            })
-            ->select();
-        $room_log = collection($room_log)->toArray();
-        foreach ($room_log as $value) {
-            $value ['message'] = '客房打卡违规';
-            $violation_log[] = $value;
-        }
-
-        //
-        //获取门禁考勤违规记录
-        $door_log = $statistics_model
-            ->where(['RoleId'=>3,'Types'=>2])
-            ->where(function($query) use ($door_check_time,$start_time,$end_time){
-                $query->where('recordDate','between',[$start_time,$door_check_time['startTime']])
-                      ->whereOr('recordDate','between',[$door_check_time['endTime'],$end_time]);
-            })
-            ->select();
-        $door_log = collection($door_log)->toArray();
-        foreach ($door_log as $value) {
-            $value ['message'] = '门禁打卡违规';
-            $violation_log[] = $value;
-        }
-
-        //
-        //获取当天全部学生数据以及需要参与课程数据
-        $user = $user_model
-            ->with([
-                       'classes'=>function($query) use ($date) {
-                           $query->with([
-                                            'lessonClass'=>function($query) use ($date)
-                                            {$query->field('l.*')->join('kx_php_lesson l','lessonId=l.id')->where('date', $date);
-                                            }]
-                           );}
-                   ])
-            ->where('roleId',3)
-            ->select();
-        $user = collection($user)->toArray();
-
-        foreach ($user as $value){
-            $shitang_log = $statistics_model->where(['UserID'=>$value['UserID'],'Types'=>1,'recordDate'=>['between',[$start_time,$end_time]]])->select();
-            $shitang_log = collection($shitang_log)->toArray();
-
-            foreach ($shitang_check_time as $val) {
-
-                $res = array_filter($shitang_log, function($v) use ($val) { return strtotime($v[0]) >= strtotime($val['startTime']) && strtotime($v[0]) <= strtotime($val['endTime']);});
-
-                if (!$res) {
-                    $violation_log[] = [
-                        'UserID'=>$value['UserID'],
-                        'UserName'=>$value['UserName'],
-                        'RealName'=>$value['RealName'],
-                        'RoleId'=>$value['RoleId'],
-                        'IDCard'=>$value['IDCard'],
-                        'message'=>$val['startTime'].' - '.$val['endTime'].'食堂考勤未打卡'
-                    ];
-                }
-            }
-
-            foreach ($value['classes']['lesson_class'] as $val) {
-
-                $res = Db::table('kx_kq_record')->field('a.time AS recordDate, b.UserID, b.UserName, b.UserCode, b.RealName, b.RoleId, b.ClassId, b.IDCard, a.sbID AS sbID')->alias('a')->join('kx_sb_guanli f','a.sbID = f.sbID')->join('kx_jc_user b','a.KaID = b.UserCode')->where(['recordDate'=>['between',[$start_time,$end_time]]])->select();
-
-            }
-        }
+    /**
+     * @title  清除学生数据以及考勤记录
+     * @readme /doc/md/api/Device/clearData.md
+     */
+    public function clearData(){
+        $start = getMicrotime();
+//        Db::execute('truncate table kx_jc_yonghuka;truncate table kx_kq_record;truncate table sb_Device_Record;truncate table 图书借阅统计;');
+//        Db::table('kx_jc_user')->join('kx_php_role','RoleId=id')->where('type',2)->delete();
+        $end = getMicrotime();
+        return $this->sendSuccess(($end - $start));
     }
 
     /**
@@ -229,11 +220,17 @@ class Device extends Base
                 'sbID' => ['name' => 'sbID', 'type' => 'string', 'require' => 'true', 'default' => '', 'desc' => '序列号', 'range' => '',],
                 'IP' => ['name' => 'IP', 'type' => 'string', 'require' => 'true', 'default' => '', 'desc' => 'ip地址', 'range' => '',],
             ],
+            'checkList' => [
+                'type' => ['name' => 'type', 'type' => 'integer', 'require' => 'true', 'default' => '', 'desc' => '类型 1:门禁,2:食堂,3:客房', 'range' => '',],
+            ],
             'setCheckTime' => [
                 'id' => ['name' => 'id', 'type' => 'integer', 'require' => 'true', 'default' => '', 'desc' => '', 'range' => '',],
                 'startTime' => ['name' => 'startTime', 'type' => 'string', 'require' => 'true', 'default' => '', 'desc' => '开始时间', 'range' => '',],
                 'endTime' => ['name' => 'endTime', 'type' => 'string', 'require' => 'true', 'default' => '', 'desc' => '结束时间', 'range' => '',],
                 'type' => ['name' => 'type', 'type' => 'integer', 'require' => 'true', 'default' => '', 'desc' => '类型 1:门禁,2:食堂,3:客房', 'range' => '',],
+            ],
+            'getLogInfo' => [
+                'log_no' => ['name' => 'log_no', 'type' => 'integer', 'require' => 'true', 'default' => '', 'desc' => '', 'range' => '',],
             ],
 
         ];

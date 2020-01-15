@@ -76,7 +76,11 @@ class Service extends HproseController
                 $data = collection($res)->toArray();
                 foreach ($data as $key=>$value) {
                     $result = Db::table('kx_php_lesson')->where(['date'=>$value['date'],'classroomId'=>$value['classroomId']])->order('startTime')->select();
-                    $data[$key]['lesson'] = collection($result)->toArray();
+                    if ($result) {
+                        $data[$key]['lesson'] = collection($result)->toArray();
+                    } else {
+                        $data[$key]['lesson'] = [];
+                    }
                 }
             } else {
                 $data = [];

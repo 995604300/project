@@ -29,13 +29,15 @@ class Task extends Command{
         $start_time =  $date . ' 00:00:00';
         $end_time = $date . ' 23:59:59';
         $where['recordDate'] = [['>',$start_time],['<',$end_time ]];
+
+        //同步消费数据
         $dev_info = Db::table('kx_sb_guanli')->where('type','ZKT_CM20')->select();
         $dev_info = collection($dev_info)->toArray();
-        //同步消费数据
+        foreach ($dev_info as $key=>$value) {
+            unset($dev_info[$key]['ROW_NUMBER']);
+        }
         $res = $this->curl_post_https('http://127.0.0.1:15511/syncconsumerdata', ['apikey' => md5('apikey' . date('Y-m-d')), 'dev_info' => $dev_info,'downloadall'=>0]);
-        $res = json_decode($res);
-        var_dump($res);exit;
-
+        json_decode($res);
         //获取门禁,食堂,房间的考勤时间
         $check_time = Db::table('kx_php_check_time')->select();
         $check_time = collection($check_time)->toArray();

@@ -24,11 +24,11 @@ class Statistics extends Base
 {
     //附加方法
     protected $extraActionList = [
+        'attendanceViolation',
+        'totalViolation',
     ];
     //跳过鉴权的方法
-    protected $skipAuthActionList = [
-        'totalViolation'
-    ];
+    protected $skipAuthActionList = ['totalViolation','attendanceViolation','index'];
     protected $statistics_model;
     protected $user_model;
     protected $violation_model;
@@ -56,16 +56,13 @@ class Statistics extends Base
         $EndTime = $request->get('EndTime');
         $RealName = $request->get('RealName');
         $ClassId = $request->get('ClassId');
-        $export = $request->get('export');
+        $export = $request->get('isExport');
         $where = [];
         if (!empty($Types)) {
             $where['Types'] = $Types;
         }
-        if (!empty($StartTime)) {
-            $where['recordDate'] = ['>=',$StartTime];
-        }
-        if (!empty($EndTime)) {
-            $where['recordDate'] = ['<=',$EndTime];
+        if (!empty($StartTime) && !empty($EndTime)) {
+            $where['recordDate'] = [['>=',$StartTime],['<=',$EndTime ]];
         }
         if (!empty($RealName)) {
             $where['RealName'] = ['like',"%".$RealName."%"];
@@ -125,7 +122,7 @@ class Statistics extends Base
     }
 
     /**
-     * @title 违规记录列表
+     * @title 违规记录列表(GET)
      * @param Request $request
      * @throws \think\Exception
      * author: Wang YX
@@ -134,21 +131,25 @@ class Statistics extends Base
     public function attendanceViolation(Request $request) {
         $start = getMicrotime();
         $size = $request->get('size') ? $request->get('size') : 10; //每页条数
-        $start_date = $request->get('start_date');
-        $end_date = $request->get('end_date');
+        $start_date = $request->get('StartTime');
+        $end_date = $request->get('EndTime');
         $classId = $request->get('classId');
-        $type = $request->get('type');
-        $export = $request->get('export');
+        $RealName = $request->get('RealName');
+        $type = $request->get('Types');
+        $export = $request->get('isExport');
 
         $where = [];
         if (!empty($start_date) && !empty($end_date)) {
-            $where['date'] = [['>',$start_date],['<',$end_date ]];
+            $where['date'] = [['>=',$start_date],['<=',$end_date ]];
         }
         if (!empty($classId)) {
             $where['classId'] = $classId;
         }
         if (!empty($type)) {
             $where['type'] = $type;
+        }
+        if (!empty($RealName)) {
+            $where['RealName'] = ['like','%'.$RealName.'%'];
         }
 
 
@@ -165,7 +166,7 @@ class Statistics extends Base
                 '1' => ['B1','姓名','RealName'],
                 '2' => ['C1','违规日期','date'],
                 '3' => ['D1','打卡设备','type'],
-                '3' => ['E1','违规记录','message'],
+                '4' => ['E1','违规记录','message'],
             ];
             $count = count($exportData);
             for ($i = 2; $i <= $count + 1; $i++) {
@@ -189,8 +190,9 @@ class Statistics extends Base
                 $exportList[$i - 2][0] = ['A'.$i,$exportData[$i - 2]['ROW_NUMBER']];
                 $exportList[$i - 2][1] = ['B'.$i,$exportData[$i - 2]['RealName']];
                 $exportList[$i - 2][2] = ['C'.$i,$exportData[$i - 2]['date']];
+
                 $exportList[$i - 2][3] = ['D'.$i,$type];
-                $exportList[$i - 2][2] = ['E'.$i,$exportData[$i - 2]['message']];
+                $exportList[$i - 2][4] = ['E'.$i,$exportData[$i - 2]['message']];
             }
             $name = date("Y-m-d").'导出违规记录数据';
             (new Export())->exportExcel($exportTitle,$exportList,$name);
@@ -208,31 +210,50 @@ class Statistics extends Base
 
     }
 
+    /**
+     * @title 违规记录统计(GET)
+     * @param Request $request
+     * @throws \think\Exception
+     * author: Wang YX
+     * @readme /doc/md/api/Statistics/attendanceViolation.md
+     */
     public function totalViolation(Request $request){
         $start = getMicrotime();
-        $start_date = $request->get('start_date');
-        $end_date = $request->get('end_date');
+        $size = $request->get('size') ? $request->get('size') : 10; //每页条数
+        $start_date = $request->get('StartTime');
+        $end_date = $request->get('EndTime');
         $classId = $request->get('classId');
-        $type = $request->get('type');
+        $RealName = $request->get('RealName');
+        $type = $request->get('Types');
 
-        $where = [];
+        $where['RoleId'] = 3;
         if (!empty($start_date) && !empty($end_date)) {
-            $where['date'] = [['>=',$start_date],['<=',$end_date ]];
+            $where1['date'] = [['>=',$start_date],['<=',$end_date ]];
         }
         if (!empty($classId)) {
             $where['classId'] = $classId;
         }
         if (!empty($type)) {
-            $where['type'] = $type;
+            $where1['type'] = $type;
+        }
+        if (!empty($RealName)) {
+            $where['RealName'] = ['like','%'.$RealName.'%'];
         }
 
-        $list = $this->violation_model
-            ->field('RealName,UserID,count(UserID) as count')
-            ->order('count DESC')
-            ->where($where)
+        $query = $this->violation_model
+            ->field('UserID,count(UserID) as count')
             ->group('UserID,RealName')
-            ->select();
-        $list = collection($list)->toArray();
+            ->where($where1)
+            ->buildSql();
+        $list = $this->user_model
+            ->alias('u')
+            ->field('u.RealName,u.UserID,w.count')
+            ->where('RoleId',3)
+            ->join([$query=>'w'],'u.UserID=w.UserID','left')
+            ->where($where)
+            ->order('count DESC')
+            ->paginate($size)
+            ->toArray();
 
         $end = getMicrotime();
         return $this->sendSuccess(($end-$start),$list);
@@ -262,11 +283,25 @@ class Statistics extends Base
                 'EndTime' => ['name' => 'EndTime', 'type' => 'date', 'require' => 'false', 'default' => '', 'desc' => '结束时间', 'range' => '',],
                 'RealName' => ['name' => 'RealName', 'type' => 'string', 'require' => 'false', 'default' => '', 'desc' => '姓名', 'range' => '',],
                 'ClassId' => ['name' => 'ClassId', 'type' => 'integer', 'require' => 'false', 'default' => '', 'desc' => '班级id', 'range' => '',],
-                'export' => ['name' => 'export', 'type' => 'bool', 'require' => 'false', 'default' => 'false', 'desc' => '是否导出', 'range' => '',],
+                'isExport' => ['name' => 'isExport', 'type' => 'bool', 'require' => 'false', 'default' => 'false', 'desc' => '是否导出', 'range' => '',],
             ],
             'attendanceViolation' => [
+                'page' => ['name' => 'page', 'type' => 'integer', 'require' => 'false', 'default' => '', 'desc' => '页', 'range' => '',],
+                'size' => ['name' => 'size', 'type' => 'integer', 'require' => 'false', 'default' => '', 'desc' => '每页数据条数', 'range' => '',],
+                'Types' => ['name' => 'Types', 'type' => 'integer', 'require' => 'false', 'default' => '', 'desc' => '1,消费信息,2门禁信息,3,班牌考勤信息,4,客房门锁信息,5,图书借阅信息', 'range' => '',],
+                'ClassId' => ['name' => 'ClassId', 'type' => 'integer', 'require' => 'false', 'default' => '', 'desc' => '班级id', 'range' => '',],
+                'RealName' => ['name' => 'RealName', 'type' => 'integer', 'require' => 'false', 'default' => '', 'desc' => '学员名称', 'range' => '',],
+                'StartTime' => ['name' => 'StartTime', 'type' => 'date', 'require' => 'false', 'default' => 'false', 'desc' => '统计开始日期', 'range' => '',],
+                'EndTime' => ['name' => 'EndTime', 'type' => 'date', 'require' => 'false', 'default' => 'false', 'desc' => '统计结束日期', 'range' => '',],
+                'isExport' => ['name' => 'isExport', 'type' => 'bool', 'require' => 'false', 'default' => 'false', 'desc' => '是否导出', 'range' => '',],
+            ],
+            'totalViolation' => [
+                'size' => ['name' => 'size', 'type' => 'integer', 'require' => 'false', 'default' => '', 'desc' => '每页数据条数', 'range' => '',],
+                'Types' => ['name' => 'Types', 'type' => 'integer', 'require' => 'false', 'default' => '', 'desc' => '1,消费信息,2门禁信息,3,班牌考勤信息,4,客房门锁信息', 'range' => '',],
+                'ClassId' => ['name' => 'ClassId', 'type' => 'integer', 'require' => 'false', 'default' => '', 'desc' => '班级id', 'range' => '',],
+                'RealName' => ['name' => 'RealName', 'type' => 'integer', 'require' => 'false', 'default' => '', 'desc' => '学员名称', 'range' => '',],
                 'start_date' => ['name' => 'start_date', 'type' => 'date', 'require' => 'false', 'default' => 'false', 'desc' => '统计开始日期', 'range' => '',],
-                'end_date' => ['name' => 'end_date', 'type' => 'date', 'require' => 'false', 'default' => 'false', 'desc' => '统计结束日期', 'range' => '',],
+                'EndTime' => ['name' => 'EndTime', 'type' => 'date', 'require' => 'false', 'default' => 'false', 'desc' => '统计结束日期', 'range' => '',],
             ]
         ];
         //可以合并公共参数
